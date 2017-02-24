@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import argparse
+import ConfigParser
+import json
+import net2ban
+import logging
+
+config = ConfigParser.ConfigParser(allow_no_value=True)
+config.readfp(open('net2ban.cfg'))
+logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO)
+
+
+def main(args):
+
+    msg = {'jail': args.jail,'command': args.command,'value': args.ip,}
+
+    n2b = net2ban.Net2Ban(username=config.get('client', 'username'),
+                          password=config.get('client', 'password'),
+                          host=config.get('client', 'server'),
+                          port=int(config.get('client', 'port')),
+                          virtual_host=config.get('client', 'virtual_host'),
+                          exchange=config.get('client', 'exchange'),
+                          exchange_type=config.get('client', 'exchange_type'),
+                          queue=config.get('client', 'queue'),
+                          ssl=bool(config.get('client', 'ssl')))
+
+    n2b.connect()
+    message = json.dumps(msg)
+    n2b.write(message)
+    logging.info(message)
+    n2b.disconnect()
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--jail', type=str, default='sshd',
+                        help="fail2ban jail to perform command on")
+    parser.add_argument('--command', type=str, default='banip',
+                        help="fail2ban command to run")
+    parser.add_argument('--ip', type=str,
+                        help="ip to perform fail2ban command on")
+    args = parser.parse_args()
+    main(args)
+
