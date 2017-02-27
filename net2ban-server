@@ -14,15 +14,15 @@ def main(args):
 
     msg = {'jail': args.jail,'command': args.command,'value': args.ip,}
 
-    n2b = net2ban.Net2Ban(username=config.get('client', 'username'),
-                          password=config.get('client', 'password'),
-                          host=config.get('client', 'server'),
-                          port=int(config.get('client', 'port')),
-                          virtual_host=config.get('client', 'virtual_host'),
-                          exchange=config.get('client', 'exchange'),
-                          exchange_type=config.get('client', 'exchange_type'),
-                          queue=config.get('client', 'queue'),
-                          ssl=bool(config.get('client', 'ssl')))
+    n2b = net2ban.Net2Ban(username=config.get('server', 'username'),
+                          password=config.get('server', 'password'),
+                          host=config.get('server', 'server'),
+                          port=int(config.get('server', 'port')),
+                          virtual_host=config.get('server', 'virtual_host'),
+                          exchange=config.get('server', 'exchange'),
+                          exchange_type=config.get('server', 'exchange_type'),
+                          queue=config.get('server', 'queue'),
+                          ssl=bool(config.get('server', 'ssl')))
 
     n2b.connect()
     message = json.dumps(msg)
@@ -42,4 +42,3 @@ if __name__ == "__main__":
                         help="ip to perform fail2ban command on")
     args = parser.parse_args()
     main(args)
-

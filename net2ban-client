@@ -28,12 +28,15 @@ class Consumer(object):
         self._channel = None
         self._closing = False
         self._consumer_tag = None
-        self._credentials = pika.PlainCredentials(config.get('client', 'username'), config.get('client', 'password'))
-        self._params = pika.ConnectionParameters(host=config.get('client', 'server'),
-                                                 port=int(config.get('client', 'port')),
-                                                 virtual_host=config.get('client', 'virtual_host'),
-                                                 credentials=self._credentials,
-                                                 ssl=bool(config.get('client', 'ssl')))
+        self._credentials = pika.PlainCredentials(
+                                              config.get('client', 'username'),
+                                              config.get('client', 'password'))
+        self._params = pika.ConnectionParameters(
+              host=config.get('client', 'server'),
+              port=int(config.get('client', 'port')),
+              virtual_host=config.get('client', 'virtual_host'),
+              credentials=self._credentials,
+              ssl=bool(config.get('client', 'ssl')))
 
     def connect(self):
         LOGGER.info('Connecting to %s', self._params)
@@ -136,7 +139,11 @@ class Consumer(object):
         try:
             data = json.loads(body)
             print data
-            subprocess.call(["fail2ban-client", "set", data['jail'], data['command'], data['value']])
+            call = ["fail2ban-client", "set", data['jail'],
+                            data['command'], data['value']]
+
+            subprocess.call(call)
+
             self.acknowledge_message(basic_deliver.delivery_tag)
         except:
             pass
@@ -175,7 +182,8 @@ class Consumer(object):
 
 
 def main():
-    logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO, format=LOG_FORMAT)
+    logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO,
+                                                         format=LOG_FORMAT)
     example = Consumer()
     try:
         example.run()
