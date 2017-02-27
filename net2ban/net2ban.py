@@ -5,64 +5,171 @@
 
 import pika
 import ssl
+import logging
 
-class InvalidParams(Exception): pass
-
-class Net2Ban(object):
-
-        def __init__ ( self , username='none', password='none', host='none', port=5671, queue='none', exchange='none', exchange_type='none', virtual_host='none', ssl=1 ):
-                self.username = username
-                self.password = password
-                self.host = host
-                self.port = port
-                self.queue = queue
-                self.exchange = exchange
-                self.exchange_type = exchange_type
-                self.virtual_host = virtual_host
-                self.ssl = ssl
+logging.basicConfig(filename='/var/log/net2ban.log', level=logging.DEBUG)
+LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
+              '-35s %(lineno) -5d: %(message)s')
+LOGGER = logging.getLogger(__name__)
 
 
-        def connect ( self ):
-                """
-                Connects to RabbitMQ server
-                """
-                self.credentials = pika.PlainCredentials(self.username,
-                                                         self.password)
+class Consumer(self, exchange, exchange_type, queue,
+               routing_key, username, password,
+               server, port. virtual_host, ssl ):
 
-                self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.host,
-                                                                                    port=int(self.port),
-                                                                                    virtual_host=self.virtual_host,
-                                                                                    credentials=self.credentials,
-                                                                                    ssl=bool(self.ssl)))
+               self.username = username
+               self.password = password
+               self.server = server
+               self.port = port
+               self.queue = queue
+               self.exchange = exchange
+               self.exchange_type = exchange_type
+               self.virtual_host = virtual_host
+               self.ssl = ssl
 
-                self.channel=self.connection.channel()
-                self.channel.exchange_declare(exchange=self.exchange,
-                                         exchange_type=self.exchange_type)
-                self.result=self.channel.queue_declare(exclusive=True)
-                self.queue_name=self.result.method.queue
-                self.channel.queue_bind(exchange=self.exchange, queue=self.queue_name)
+    def __init__(self):
 
+        self._connection = None
+        self._channel = None
+        self._closing = False
+        self._consumer_tag = None
+        self._credentials = pika.PlainCredentials(self.username, self.password)
 
-        def disconnect ( self ):
-                """
-                Disconnects from RabbitMQ server
-                """
-                self.connection.close()
+        self._params = pika.ConnectionParameters(
+              host=self.server,
+              port=int(self.port),
+              virtual_host=self.virtual_host,
+              credentials=self._credentials,
+              ssl=bool(self.ssl))
 
+    def connect(self):
+        LOGGER.info('Connecting to %s', self._params)
+        return pika.SelectConnection(self._params,
+                                     self.on_connection_open,
+                                     stop_ioloop_on_close=False)
 
-        def write ( self , msg ):
-                """
-                Sends a message to the queue
-                """
-                self.channel.basic_publish ( exchange = self.exchange , routing_key = self.queue , body = msg , properties = pika.BasicProperties ( delivery_mode = 2 ) )
+    def on_connection_open(self, unused_connection):
+        LOGGER.info('Connection opened')
+        self.add_on_connection_close_callback()
+        self.open_channel()
 
+    def add_on_connection_close_callback(self):
+        LOGGER.info('Adding connection close callback')
+        self._connection.add_on_close_callback(self.on_connection_closed)
 
-        def start_read ( self , callback ):
-                """
-                Declares a callback function to receive messages
-                """
-                self.channel.queue_declare ( queue = self.queue , durable = True )
-                self.channel.basic_qos ( prefetch_count = 1 )
-                self.channel.basic_consume ( callback , queue = self.queue )
-                self.channel.start_consuming()
+    def on_connection_closed(self, connection, reply_code, reply_text):
+        self._channel = None
+        if self._closing:
+            self._connection.ioloop.stop()
+        else:
+            LOGGER.warning('Connection closed, reopening in 5 seconds: (%s) %s',
+                           reply_code, reply_text)
+            self._connection.add_timeout(5, self.reconnect)
 
+    def reconnect(self):
+        # This is the old connection IOLoop instance, stop its ioloop
+        self._connection.ioloop.stop()
+
+        if not self._closing:
+
+            # Create a new connection
+            self._connection = self.connect()
+
+            # There is now a new connection, needs a new ioloop to run
+            self._connection.ioloop.start()
+
+    def open_channel(self):
+        LOGGER.info('Creating a new channel')
+        self._connection.channel(on_open_callback=self.on_channel_open)
+
+    def on_channel_open(self, channel):
+        LOGGER.info('Channel opened')
+        self._channel = channel
+        self.add_on_channel_close_callback()
+        self.setup_exchange(self.exchange)
+
+    def add_on_channel_close_callback(self):
+        LOGGER.info('Adding channel close callback')
+        self._channel.add_on_close_callback(self.on_channel_closed)
+
+    def on_channel_closed(self, channel, reply_code, reply_text):
+        LOGGER.warning('Channel %i was closed: (%s) %s',
+                       channel, reply_code, reply_text)
+        self._connection.close()
+
+    def setup_exchange(self, exchange_name):
+        LOGGER.info('Declaring exchange_type %s', self.exchange_type)
+        self._channel.exchange_declare(self.on_exchange_declareok,
+                                       exchange_name,
+                                       self.exchange_type)
+
+    def on_exchange_declareok(self, unused_frame):
+        LOGGER.info('Exchange declared')
+        self.setup_queue(self.queue)
+
+    def setup_queue(self, queue_name):
+        LOGGER.info('Declaring queue %s', queue_name)
+        self._channel.queue_declare(self.on_queue_declareok, queue_name)
+
+    def on_queue_declareok(self, method_frame):
+        LOGGER.info('Binding %s to %s with %s',
+                    self.exchange, self.queue, self.routing_key)
+        self._channel.queue_bind(self.on_bindok, self.queue,
+                                 self.exchange, self.routing_key)
+
+    def on_bindok(self, unused_frame):
+        LOGGER.info('Queue bound')
+        self.start_consuming()
+
+    def start_consuming(self):
+        LOGGER.info('Issuing consumer related RPC commands')
+        self.add_on_cancel_callback()
+        self._consumer_tag = self._channel.basic_consume(self.on_message,
+                                                         self.queue)
+
+    def add_on_cancel_callback(self):
+        LOGGER.info('Adding consumer cancellation callback')
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
+
+    def on_consumer_cancelled(self, method_frame):
+        LOGGER.info('Consumer was cancelled remotely, shutting down: %r',
+                    method_frame)
+        if self._channel:
+            self._channel.close()
+
+    def on_message(self, unused_channel, basic_deliver, properties, body):
+        LOGGER.info('Received message # %s from %s: %s',
+                    basic_deliver.delivery_tag, properties.app_id, body)
+        self.acknowledge_message(basic_deliver.delivery_tag)
+
+    def acknowledge_message(self, delivery_tag):
+        LOGGER.info('Acknowledging message %s', delivery_tag)
+        self._channel.basic_ack(delivery_tag)
+
+    def stop_consuming(self):
+        if self._channel:
+            LOGGER.info('Sending a Basic.Cancel RPC command to RabbitMQ')
+            self._channel.basic_cancel(self.on_cancelok, self._consumer_tag)
+
+    def on_cancelok(self, unused_frame):
+        LOGGER.info('RabbitMQ acknowledged the cancellation of the consumer')
+        self.close_channel()
+
+    def close_channel(self):
+        LOGGER.info('Closing the channel')
+        self._channel.close()
+
+    def run(self):
+        self._connection = self.connect()
+        self._connection.ioloop.start()
+
+    def stop(self):
+        LOGGER.info('Stopping')
+        self._closing = True
+        self.stop_consuming()
+        self._connection.ioloop.start()
+        LOGGER.info('Stopped')
+
+    def close_connection(self):
+        LOGGER.info('Closing connection')
+        self._connection.close()
