@@ -14,18 +14,18 @@ def main(args):
 
     msg = {'jail': args.jail,'command': args.command,'value': args.ip,}
 
-    n2b = net2ban.Net2Ban(username=config.get('server', 'username'),
-                          password=config.get('server', 'password'),
-                          host=config.get('server', 'server'),
-                          port=int(config.get('server', 'port')),
-                          virtual_host=config.get('server', 'virtual_host'),
-                          exchange=config.get('server', 'exchange'),
-                          exchange_type=config.get('server', 'exchange_type'),
-                          queue=config.get('server', 'queue'),
-                          ssl=bool(config.get('server', 'ssl')))
+    n2b = net2ban.Consumer(username=config.get('server', 'username'),
+                           password=config.get('server', 'password'),
+                           host=config.get('server', 'server'),
+                           port=int(config.get('server', 'port')),
+                           virtual_host=config.get('server', 'virtual_host'),
+                           exchange=config.get('server', 'exchange'),
+                           exchange_type=config.get('server', 'exchange_type'),
+                           queue=config.get('server', 'queue'),
+                           ssl=bool(config.get('server', 'ssl')))
 
-    n2b.connect()
     message = json.dumps(msg)
+    n2b.connect()
     n2b.write(message)
     logging.info(message)
     n2b.disconnect()

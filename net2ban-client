@@ -4,7 +4,6 @@ import ConfigParser
 import json
 import subprocess
 import logging
-import net2ban
 import pika
 import socket
 
@@ -14,37 +13,6 @@ config.readfp(open('/etc/net2ban/net2ban.cfg'))
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
-
-
-def main():
-    n2b = net2ban.Consumer(username=config.get('client', 'username'),
-                            password=config.get('client', 'password'),
-                            host=config.get('client', 'server'),
-                            port=int(config.get('client', 'port')),
-                            virtual_host=config.get('client', 'virtual_host'),
-                            exchange=config.get('client', 'exchange'),
-                            exchange_type=config.get('client', 'exchange_type'),
-                            ssl=bool(config.get('client', 'ssl')))
-
-
-    def callback(ch, method, properties, body):
-        data = json.loads(body)
-        logging.info('message:'+data)
-        subprocess.call(["fail2ban-client", "set",
-                        data['jail'], data['command'], data['value']])
-
-
-    def stop():
-        n2b.disconnect()
-        sys.exit(0)
-
-
-    n2b.connect()
-    n2b.start_read(callback)
-
-
-if __name__ == '__main__':
-    main()
 
 
 class Consumer(object):
@@ -60,16 +28,13 @@ class Consumer(object):
         self._channel = None
         self._closing = False
         self._consumer_tag = None
-        self._credentials = pika.PlainCredentials(
-                                              config.get('client', 'username'),
-                                              config.get('client', 'password'))
+        self._credentials = pika.PlainCredentials(config.get('client', 'username'), config.get('client', 'password'))
+        self._params = pika.ConnectionParameters(host=config.get('client', 'server'),
+                                                 port=int(config.get('client', 'port')),
+                                                 virtual_host=config.get('client', 'virtual_host'),
+                                                 credentials=self._credentials,
+                                                 ssl=bool(config.get('client', 'ssl')))
 
-        self._params = pika.ConnectionParameters(
-              host=config.get('client', 'server'),
-              port=int(config.get('client', 'port')),
-              virtual_host=config.get('client', 'virtual_host'),
-              credentials=self._credentials,
-              ssl=bool(config.get('client', 'ssl')))
 
     def connect(self):
         LOGGER.info('Connecting to %s', self._params)
@@ -172,9 +137,7 @@ class Consumer(object):
         try:
             data = json.loads(body)
             print data
-            subprocess.call(["fail2ban-client", "set", data['jail'],
-                            data['command'], data['value']])
-
+            subprocess.call(["fail2ban-client", "set", data['jail'], data['command'], data['value']])
             self.acknowledge_message(basic_deliver.delivery_tag)
         except:
             pass
@@ -213,9 +176,7 @@ class Consumer(object):
 
 
 def main():
-    logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO,
-                        format=LOG_FORMAT)
-
+    logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO, format=LOG_FORMAT)
     example = Consumer()
     try:
         example.run()
