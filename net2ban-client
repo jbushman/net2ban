@@ -28,7 +28,8 @@ class Consumer(object):
         self._channel = None
         self._closing = False
         self._consumer_tag = None
-        self._credentials = pika.PlainCredentials(config.get('client', 'username'), config.get('client', 'password'))
+        self._credentials = pika.PlainCredentials(config.get('client', 'username'),
+                                                  config.get('client', 'password'))
         self._params = pika.ConnectionParameters(host=config.get('client', 'server'),
                                                  port=int(config.get('client', 'port')),
                                                  virtual_host=config.get('client', 'virtual_host'),
@@ -137,7 +138,8 @@ class Consumer(object):
         try:
             data = json.loads(body)
             print data
-            subprocess.call(["fail2ban-client", "set", data['jail'], data['command'], data['value']])
+            subprocess.call(["fail2ban-client", "set", data['jail'],
+                             data['command'], data['value']])
             self.acknowledge_message(basic_deliver.delivery_tag)
         except:
             pass
@@ -176,12 +178,13 @@ class Consumer(object):
 
 
 def main():
-    logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO, format=LOG_FORMAT)
-    example = Consumer()
+    logging.basicConfig(filename='/var/log/net2ban.log',
+                        level=logging.INFO, format=LOG_FORMAT)
+    n2b = Consumer()
     try:
-        example.run()
+        n2b.run()
     except KeyboardInterrupt:
-        example.stop()
+        n2b.stop()
 
 
 if __name__ == '__main__':
