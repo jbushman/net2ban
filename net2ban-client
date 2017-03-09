@@ -137,7 +137,6 @@ class Consumer(object):
                     basic_deliver.delivery_tag, properties.app_id, body)
         try:
             data = json.loads(body)
-            print data
             subprocess.call(["fail2ban-client", "set", data['jail'],
                              data['command'], data['value']])
             self.acknowledge_message(basic_deliver.delivery_tag)
