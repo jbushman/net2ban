@@ -4,31 +4,29 @@
 #
 
 import pika
-import ssl
 import logging
 
-logging.basicConfig(filename='/var/log/net2ban.log', level=logging.DEBUG)
+logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO)
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
 
-class Consumer(self, exchange, exchange_type, queue, routing_key, username,
-               password, server, port, virtual_host, ssl):
+class Consumer():
 
-    self.username = username
-    self.password = password
-    self.server = server
-    self.port = port
-    self.queue = queue
-    self.routing_key = routing_key
-    self.exchange = exchange
-    self.exchange_type = exchange_type
-    self.virtual_host = virtual_host
-    self.ssl = ssl
+    def __init__(self, exchange, exchange_type, queue, routing_key, username,
+                 password, server, port, virtual_host, ssl):
 
-    def __init__(self):
-
+        self.username = username
+        self.password = password
+        self.server = server
+        self.port = port
+        self.queue = queue
+        self.routing_key = routing_key
+        self.exchange = exchange
+        self.exchange_type = exchange_type
+        self.virtual_host = virtual_host
+        self.ssl = ssl
         self._connection = None
         self._channel = None
         self._closing = False
