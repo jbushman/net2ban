@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+import argparse
+import ConfigParser
+import json
+import net2ban
+import logging
+import os
+import time
+import sys
+import socket
+
+config = ConfigParser.ConfigParser(allow_no_value=True)
+config.readfp(open('/etc/net2ban/net2ban.cfg'))
+logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO)
+
+
+class JailAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        jail = ['sshd','sshd-ddos','exim','exim-spam','dovecot','all']
+        if values not in jail:
+            print "Invalid Jail:", values
+            print jail
+            raise ValueError("Invalid Jail")
+        setattr(namespace, self.dest, values)
+
+
+class CommandAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        command = ['banip','unbanip']
+        if values not in command:
+            print "Invalid Command:", values
+            print command
+            raise ValueError("Invalid Command")
+        setattr(namespace, self.dest, values)
+
+
+class IPAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        a = values.split('.')
+        if len(a) != 4:
+            print "Invalid IP:", values
+            raise ValueError("Not a valid IP")
+        for x in a:
+            if not x.isdigit():
+                print "Invalid IP:", values
+                raise ValueError("Not a valid IP")
+            i = int(x)
+            if i < 0 or i > 255:
+                print "Invalid IP:", values
+                raise ValueError("Not a valid IP")
+        setattr(namespace, self.dest, values)
+
+
+def main(args):
+    n2bmsg = {'timestamp': int(time.time()), 'jail': args.jail,'command': args.command,'value': args.ip,}
+    message = json.dumps(n2bmsg)
+    try:
+        n2bsocket = config.get('client', 'socket')
+        sock = socket.socket(socket.AF_UNIX)
+        sock.settimeout(1)
+        sock.connect(n2bsocket)
+        sock.sendall(message)
+        data = sock.recv(1024)
+        if data == 'true':                                      
+            logging.info('net2banctl: %s' % n2bmsg)
+            n2b = net2ban.Net2Ban(username=config.get('client', 'username'),
+                                  password=config.get('client', 'password'),
+                                  host=config.get('client', 'server'),
+                                  port=int(config.get('client', 'port')),
+                                  virtual_host=config.get('client', 'virtual_host'),
+                                  exchange=config.get('client', 'exchange'),
+                                  exchange_type=config.get('client', 'exchange_type'),
+                                  queue=config.get('client', 'queue'),
+                                  ssl=bool(config.get('client', 'ssl')))
+
+            n2b.connect()
+            n2b.write(message)
+            logging.info('net2banctl' + message)
+            n2b.disconnect()
+        else:
+            sys.exit(0)
+
+    except socket.error, msg:
+        logging.error(msg)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--jail', type=str, action=JailAction,
+                        help="fail2ban jail to perform command on")
+    parser.add_argument('--command', type=str, action=CommandAction,
+                        help="fail2ban command to run")
+    parser.add_argument('--ip', type=str, action=IPAction,
+                        help="ip to perform fail2ban command on")
+    args = parser.parse_args()
+    main(args)
