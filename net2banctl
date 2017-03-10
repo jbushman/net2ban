@@ -4,7 +4,6 @@ import ConfigParser
 import json
 import net2ban
 import logging
-import os
 import time
 import sys
 import socket
@@ -16,7 +15,7 @@ logging.basicConfig(filename='/var/log/net2ban.log', level=logging.INFO)
 
 class JailAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        jail = ['sshd','sshd-ddos','exim','exim-spam','dovecot','all']
+        jail = ['sshd', 'sshd-ddos', 'exim', 'exim-spam', 'dovecot', 'all']
         if values not in jail:
             print "Invalid Jail:", values
             print jail
@@ -26,7 +25,7 @@ class JailAction(argparse.Action):
 
 class CommandAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        command = ['banip','unbanip']
+        command = ['banip', 'unbanip']
         if values not in command:
             print "Invalid Command:", values
             print command
@@ -52,7 +51,8 @@ class IPAction(argparse.Action):
 
 
 def main(args):
-    n2bmsg = {'timestamp': int(time.time()), 'jail': args.jail,'command': args.command,'value': args.ip,}
+    n2bmsg = {'timestamp': int(time.time()), 'jail': args.jail,
+              'command': args.command, 'value': args.ip, }
     message = json.dumps(n2bmsg)
     try:
         n2bsocket = config.get('client', 'socket')
@@ -61,15 +61,17 @@ def main(args):
         sock.connect(n2bsocket)
         sock.sendall(message)
         data = sock.recv(1024)
-        if data == 'true':                                      
+        if data == 'true':
             logging.info('net2banctl: %s' % n2bmsg)
             n2b = net2ban.Net2Ban(username=config.get('client', 'username'),
                                   password=config.get('client', 'password'),
                                   host=config.get('client', 'server'),
                                   port=int(config.get('client', 'port')),
-                                  virtual_host=config.get('client', 'virtual_host'),
+                                  virtual_host=config.get('client',
+                                                          'virtual_host'),
                                   exchange=config.get('client', 'exchange'),
-                                  exchange_type=config.get('client', 'exchange_type'),
+                                  exchange_type=config.get('client',
+                                                           'exchange_type'),
                                   queue=config.get('client', 'queue'),
                                   ssl=bool(config.get('client', 'ssl')))
 
