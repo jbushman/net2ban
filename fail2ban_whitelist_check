@@ -1,42 +1,30 @@
 #!/usr/bin/env python
 
-import os
-import socket
+import ConfigParser
 import sys
+import json
+import socket
+
+config = ConfigParser.ConfigParser(allow_no_value=True)
+config.readfp(open('/etc/net2ban/net2ban.cfg'))
+
 
 def main(argv):
 
-    whitelist = ['127.0.0.1/8','162.144.11.10','10.0.46.22']
-    try:
-        if argv[1] in whitelist:
-            print 0
-            return 0
-    except:
-        pass
-
-    whitelist.append(socket.gethostbyname(socket.gethostname()))
-
-    if os.path.isfile('/etc/fail2ban/fail2ban_whitelist'):
-        with open('/etc/fail2ban/fail2ban_whitelist') as f:
-            wl = f.read().splitlines()
-            whitelist.extend(wl)
-
-    if os.path.isfile('/etc/ips'):
-        with open('/etc/ips') as f:
-            etcips = f.read().splitlines()
-            for line in etcips:
-                etcip = line.split(':', 1)
-                whitelist.append(etcip[0])
-
-        try:
-            if argv[1] in whitelist:
-                print 0
-                return 0
-            else:
-                print 1
-                return 1
-        except:
-            pass
+    n2bsocket = config.get('client', 'socket')
+    sock = socket.socket(socket.AF_UNIX)
+    sock.settimeout(1)
+    sock.connect(n2bsocket)
+    data = {'check':'whitelist', 'value':argv[1]}
+    msg = json.dumps(data)
+    sock.sendall(msg)
+    data = sock.recv(1024)
+    if data == 'True':
+        print "%s is Whitelisted" %argv[1]
+        sys.exit(0)
+    else:
+        print  "%s is NOT Whitelisted" %argv[1]
+        sys.exit(1)
 
 
 if __name__ == "__main__":
