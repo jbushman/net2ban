@@ -36,7 +36,7 @@ def main():
         n2bmsg = {'timestamp': data['timestamp'], 'jail': data['jail'],
                   'command': data['command'], 'value': data['value'], }
 
-        if(os.path.isfile('/tmp/n2bmsgs.p')):
+        if (os.path.isfile('/tmp/n2bmsgs.p')):
             with open("/tmp/n2bmsgs.p", "rb") as f:
                 n2bmsgs = pickle.load(f)
             for entry in n2bmsgs:
@@ -44,13 +44,15 @@ def main():
                     del entry
 
             for entry in n2bmsgs:
-                if n2bmsg['value'] == entry['value']:
-                    if n2bmsg['jail'] == entry['jail']:
-                        if n2bmsg['command'] == entry['command']:
-                            logging.info('DUPLICATE message # %s from %s: %s',
-                                         basic_deliver.delivery_tag,
-                                         properties.app_id, body)
-                            return None
+                if (
+                    n2bmsg['value'] == entry['value']
+                    and n2bmsg['jail'] == entry['jail']
+                    and n2bmsg['command'] == entry['command']
+                ):
+                    logging.info('DUPLICATE message # %s from %s: %s',
+                                 basic_deliver.delivery_tag,
+                                 properties.app_id, body)
+                    return None
 
         else:
             with open("/tmp/n2bmsgs.p", "wb") as f:
